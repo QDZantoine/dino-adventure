@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -12,13 +12,7 @@ import { ArrowLeft, Brain, Star, Check } from "lucide-react"
 export default function MemoryGame() {
   const [gameState, setGameState] = useState<"menu" | "playing">("menu")
   const [selectedLevel, setSelectedLevel] = useState(1)
-  const [progress, setProgress] = useState<GameProgress | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
-
-  useEffect(() => {
-    const currentProgress = getProgress()
-    setProgress(currentProgress)
-  }, [refreshKey])
+  const [progress, setProgress] = useState<GameProgress | null>(() => getProgress())
 
   const handlePlay = (level: number) => {
     setSelectedLevel(level)
@@ -27,7 +21,7 @@ export default function MemoryGame() {
 
   const handleBack = () => {
     setGameState("menu")
-    setRefreshKey((k) => k + 1)
+    setProgress(getProgress())
   }
 
   if (gameState === "playing") {

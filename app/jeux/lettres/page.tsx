@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Card } from "@/components/ui/card"
@@ -22,6 +22,11 @@ import {
   Check,
   X,
 } from "lucide-react"
+
+const TOTAL_QUESTIONS = 8
+const LETTER_CHOICES = 4
+const SOUND_DELAY_MS = 200
+const ANSWER_DELAY_MS = 1500
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
@@ -48,37 +53,59 @@ const letterColors = [
   "from-purple-400/90 to-pink-500/90",
 ]
 
+function createGameState() {
+  const pool = shuffleArray(dinoForQuiz).slice(0, TOTAL_QUESTIONS)
+  const firstLetter = pool[0]?.name.charAt(0).toUpperCase()
+  return {
+    dinosaurs: pool,
+    letters: firstLetter ? getRandomLetters(firstLetter, LETTER_CHOICES) : [],
+  }
+}
+
 export default function LettresGame() {
-  const [dinosaurs, setDinosaurs] = useState<Dinosaur[]>([])
+  const initialStateRef = useRef(createGameState())
+  const [dinosaurs, setDinosaurs] = useState<Dinosaur[]>(
+    initialStateRef.current.dinosaurs
+  )
   const [currentIndex, setCurrentIndex] = useState(0)
   const [score, setScore] = useState(0)
-  const [letters, setLetters] = useState<string[]>([])
+  const [letters, setLetters] = useState<string[]>(initialStateRef.current.letters)
   const [showResult, setShowResult] = useState(false)
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null)
   const [isCorrect, setIsCorrect] = useState(false)
   const [gameOver, setGameOver] = useState(false)
-
-  const totalQuestions = 8
+  const soundTimeoutRef = useRef<number | null>(null)
+  const nextTimeoutRef = useRef<number | null>(null)
 
   const initGame = useCallback(() => {
-    const shuffled = shuffleArray(dinoForQuiz).slice(0, totalQuestions)
-    setDinosaurs(shuffled)
+    if (soundTimeoutRef.current !== null) {
+      window.clearTimeout(soundTimeoutRef.current)
+    }
+    if (nextTimeoutRef.current !== null) {
+      window.clearTimeout(nextTimeoutRef.current)
+    }
+
+    const { dinosaurs: pool, letters: initialLetters } = createGameState()
+    setDinosaurs(pool)
     setCurrentIndex(0)
     setScore(0)
     setShowResult(false)
     setSelectedLetter(null)
     setIsCorrect(false)
     setGameOver(false)
-
-    if (shuffled.length > 0) {
-      const firstLetter = shuffled[0].name.charAt(0).toUpperCase()
-      setLetters(getRandomLetters(firstLetter, 4))
-    }
+    setLetters(initialLetters)
   }, [])
 
   useEffect(() => {
-    initGame()
-  }, [initGame])
+    return () => {
+      if (soundTimeoutRef.current !== null) {
+        window.clearTimeout(soundTimeoutRef.current)
+      }
+      if (nextTimeoutRef.current !== null) {
+        window.clearTimeout(nextTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const currentDino = dinosaurs[currentIndex]
   const correctLetter = currentDino?.name.charAt(0).toUpperCase()
@@ -92,19 +119,26 @@ export default function LettresGame() {
     setIsCorrect(correct)
     setShowResult(true)
 
-    if (correct) {
-      setScore((s) => s + 1)
-      setTimeout(() => playMatchSound(), 200)
-    } else {
-      setTimeout(() => playMismatchSound(), 200)
+    if (soundTimeoutRef.current !== null) {
+      window.clearTimeout(soundTimeoutRef.current)
+    }
+    if (nextTimeoutRef.current !== null) {
+      window.clearTimeout(nextTimeoutRef.current)
     }
 
-    setTimeout(() => {
+    if (correct) {
+      setScore((s) => s + 1)
+      soundTimeoutRef.current = window.setTimeout(() => playMatchSound(), SOUND_DELAY_MS)
+    } else {
+      soundTimeoutRef.current = window.setTimeout(() => playMismatchSound(), SOUND_DELAY_MS)
+    }
+
+    nextTimeoutRef.current = window.setTimeout(() => {
       if (currentIndex < dinosaurs.length - 1) {
         const nextIndex = currentIndex + 1
         setCurrentIndex(nextIndex)
         const nextLetter = dinosaurs[nextIndex].name.charAt(0).toUpperCase()
-        setLetters(getRandomLetters(nextLetter, 4))
+        setLetters(getRandomLetters(nextLetter, LETTER_CHOICES))
         setShowResult(false)
         setSelectedLetter(null)
         setIsCorrect(false)
@@ -112,7 +146,7 @@ export default function LettresGame() {
         setGameOver(true)
         playWinSound()
       }
-    }, 1500)
+    }, ANSWER_DELAY_MS)
   }
 
   if (dinosaurs.length === 0) {
@@ -127,7 +161,7 @@ export default function LettresGame() {
   }
 
   if (gameOver) {
-    const percentage = Math.round((score / totalQuestions) * 100)
+    const percentage = Math.round((score / TOTAL_QUESTIONS) * 100)
     let message = ""
     let IconComponent = Trophy
 
@@ -159,7 +193,7 @@ export default function LettresGame() {
         <Card className="rounded-2xl border border-primary/10 bg-white/90 p-8 text-center shadow-soft">
           <p className="text-lg font-semibold text-muted-foreground">Ton score</p>
           <p className="text-6xl font-black text-primary">
-            {score}/{totalQuestions}
+            {score}/{TOTAL_QUESTIONS}
           </p>
           <div className="mt-5">
             <Progress value={percentage} className="h-4" />
@@ -222,14 +256,14 @@ export default function LettresGame() {
           </span>
           <span className="text-base text-slate-400">/</span>
           <span className="text-base font-semibold text-slate-600">
-            {totalQuestions}
+            {TOTAL_QUESTIONS}
           </span>
         </div>
       </div>
 
       {/* Progress bar */}
       <Progress
-        value={((currentIndex + 1) / totalQuestions) * 100}
+        value={((currentIndex + 1) / TOTAL_QUESTIONS) * 100}
         className="mb-6 h-4 w-full max-w-lg"
       />
 

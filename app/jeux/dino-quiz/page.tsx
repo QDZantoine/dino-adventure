@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Card } from "@/components/ui/card";
@@ -24,6 +24,9 @@ import {
   X,
 } from "lucide-react";
 
+const TOTAL_QUESTIONS = 10;
+const ANSWER_DELAY_MS = 1500;
+
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -33,8 +36,12 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+function createQuizPool(): Dinosaur[] {
+  return shuffleArray(dinoForQuiz).slice(0, TOTAL_QUESTIONS);
+}
+
 export default function DinoQuiz() {
-  const [dinosaurs, setDinosaurs] = useState<Dinosaur[]>([]);
+  const [dinosaurs, setDinosaurs] = useState<Dinosaur[]>(createQuizPool);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [showResult, setShowResult] = useState(false);
@@ -42,22 +49,16 @@ export default function DinoQuiz() {
     null
   );
   const [gameOver, setGameOver] = useState(false);
-
-  const totalQuestions = 10;
+  const timeoutRef = useRef<number | null>(null);
 
   const initGame = useCallback(() => {
-    const shuffled = shuffleArray(dinoForQuiz).slice(0, totalQuestions);
-    setDinosaurs(shuffled);
+    setDinosaurs(createQuizPool());
     setCurrentIndex(0);
     setScore(0);
     setShowResult(false);
     setLastAnswer(null);
     setGameOver(false);
   }, []);
-
-  useEffect(() => {
-    initGame();
-  }, [initGame]);
 
   const currentDino = dinosaurs[currentIndex];
 
@@ -75,7 +76,10 @@ export default function DinoQuiz() {
       playMismatchSound();
     }
 
-    setTimeout(() => {
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = window.setTimeout(() => {
       if (currentIndex < dinosaurs.length - 1) {
         setCurrentIndex((i) => i + 1);
         setShowResult(false);
@@ -84,8 +88,16 @@ export default function DinoQuiz() {
         setGameOver(true);
         playWinSound();
       }
-    }, 1500);
+    }, ANSWER_DELAY_MS);
   };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   if (dinosaurs.length === 0) {
     return (
@@ -101,7 +113,7 @@ export default function DinoQuiz() {
   }
 
   if (gameOver) {
-    const percentage = Math.round((score / totalQuestions) * 100);
+    const percentage = Math.round((score / TOTAL_QUESTIONS) * 100);
     let message = "";
     let IconComponent = Trophy;
 
@@ -137,7 +149,7 @@ export default function DinoQuiz() {
             Ton score
           </p>
           <p className="text-6xl font-black text-primary">
-            {score}/{totalQuestions}
+            {score}/{TOTAL_QUESTIONS}
           </p>
           <div className="mt-5">
             <Progress value={percentage} className="h-4" />
@@ -198,14 +210,14 @@ export default function DinoQuiz() {
           </span>
           <span className="text-base text-slate-400">/</span>
           <span className="text-base font-semibold text-slate-600">
-            {totalQuestions}
+            {TOTAL_QUESTIONS}
           </span>
         </div>
       </div>
 
       {/* Progress bar */}
       <Progress
-        value={((currentIndex + 1) / totalQuestions) * 100}
+        value={((currentIndex + 1) / TOTAL_QUESTIONS) * 100}
         className="mb-6 h-4 w-full max-w-lg"
       />
 

@@ -26,6 +26,10 @@ interface PuzzlePiece {
 }
 
 const pieceLabels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+const LEVELS = {
+  1: { gridSize: 2, pieceCount: 4 },
+  2: { gridSize: 3, pieceCount: 9 },
+} as const
 const pieceColors = [
   "from-red-400/90 to-red-500/90",
   "from-orange-400/90 to-orange-500/90",
@@ -47,6 +51,29 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled
 }
 
+function getLevelConfig(level: number) {
+  return level === 1 ? LEVELS[1] : LEVELS[2]
+}
+
+function createShuffledPieces(count: number) {
+  const initialPieces: PuzzlePiece[] = Array.from({ length: count }, (_, i) => ({
+    id: i,
+    currentPos: i,
+    label: pieceLabels[i],
+  }))
+
+  let shuffledPieces: PuzzlePiece[]
+  do {
+    const shuffledPositions = shuffleArray(Array.from({ length: count }, (_, i) => i))
+    shuffledPieces = initialPieces.map((piece, index) => ({
+      ...piece,
+      currentPos: shuffledPositions[index],
+    }))
+  } while (shuffledPieces.every((p) => p.id === p.currentPos))
+
+  return shuffledPieces
+}
+
 export default function PuzzleGame() {
   const [level, setLevel] = useState<number | null>(null)
   const [currentDino, setCurrentDino] = useState<Dinosaur | null>(null)
@@ -58,32 +85,15 @@ export default function PuzzleGame() {
   const gridRef = useRef<HTMLDivElement>(null)
   const touchStartPos = useRef<number | null>(null)
 
-  const gridSize = level === 1 ? 2 : 3
+  const gridSize = level === null ? 0 : getLevelConfig(level).gridSize
 
   const initGame = useCallback((selectedLevel: number) => {
     const dino = dinosaurs[Math.floor(Math.random() * dinosaurs.length)]
     setCurrentDino(dino)
     setLevel(selectedLevel)
 
-    const size = selectedLevel === 1 ? 4 : 9
-
-    const initialPieces: PuzzlePiece[] = Array.from({ length: size }, (_, i) => ({
-      id: i,
-      currentPos: i,
-      label: pieceLabels[i],
-    }))
-
-    // Mélanger jusqu'à ce que ce ne soit pas déjà résolu
-    let shuffledPieces: PuzzlePiece[]
-    do {
-      const shuffledPositions = shuffleArray(Array.from({ length: size }, (_, i) => i))
-      shuffledPieces = initialPieces.map((piece, index) => ({
-        ...piece,
-        currentPos: shuffledPositions[index],
-      }))
-    } while (shuffledPieces.every((p) => p.id === p.currentPos))
-
-    setPieces(shuffledPieces)
+    const { pieceCount } = getLevelConfig(selectedLevel)
+    setPieces(createShuffledPieces(pieceCount))
     setDraggedPiece(null)
     setDragOverPiece(null)
     setMoves(0)
